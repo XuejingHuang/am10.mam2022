@@ -14,15 +14,15 @@ font_import()
 # Windows: use skyfonts to download google fonts on your computer https://www.fonts.com/web-fonts/google 
 # if using skyfonts, point to the directory where google fonts live 
 # on my windows machine this is @
-font_import( paths="C:/Users/kchristodoulou/AppData/Roaming/Monotype/skyfonts-google")
+# font_import( paths="C:/Users/kchristodoulou/AppData/Roaming/Monotype/skyfonts-google")
 
 #if you use FontBase to get all Google fonts
-font_import( paths="C:/Users/kchristodoulou/FontBase")
+font_import( paths="/Users/huangxuejing/Documents/fonts-main")
 
 # Alternatively, you can download all of google fonts, by downloading and extracting 
 # https://github.com/google/fonts/archive/master.zip (over 300 Mb) from https://github.com/google/fonts
 
-extrafont::loadfonts(device="win")
+extrafont::loadfonts(device="pdf")
 
 
 # Vector of font family names
@@ -39,7 +39,7 @@ ggplot(mtcars, aes(x=wt, y=mpg)) +
   theme_minimal()+
   NULL
 
-p1 <- plot + theme(text=element_text(size=16, family="Fira Sans"))
+p1 <- plot + theme(text=element_text(size=16, family="Noto Sans"))
 p2 <- plot + theme(text=element_text(size=16, family="Bahnschrift"))
 p3 <- plot + theme(text=element_text(size=16, family="Oswald"))
 p4 <- plot + theme(text=element_text(size=16, family="Rock Salt"))

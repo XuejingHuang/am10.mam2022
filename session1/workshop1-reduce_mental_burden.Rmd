@@ -40,12 +40,13 @@ library(ggrepel)
 library(patchwork)
 library(gghighlight)
 library(skimr)
+library(Rcpp)
 
 # remotes::install_github("kjhealy/nycdogs")
 library(nycdogs)
 library(sf) # for geospatial visualisation
 
-loadfonts(device="win")
+loadfonts(device="pdf")
 # loadfonts(device="pdf") if you have a mac
 
 ```
