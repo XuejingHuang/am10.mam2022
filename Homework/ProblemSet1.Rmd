@@ -1,0 +1,264 @@
+---
+title: "ProblemSet1"
+author: "Xuejing"
+date: "09/11/2021"
+output:
+  html_document:
+    theme: cerulean
+    number_sections: no
+    toc: yes
+    toc_float: yes
+    code_folding: show
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r libraries, include=FALSE}
+library(ggthemes)
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+library(lubridate)
+library(extrafont)
+library(vroom)
+library(ggtext)
+library(gapminder)
+library(ggrepel)
+library(patchwork)
+library(gghighlight)
+library(skimr)
+library(Rcpp)
+library(janitor) # clean_names()
+library(ggforce)
+
+# remotes::install_github("kjhealy/nycdogs")
+library(nycdogs)
+library(sf) # for geospatial visualisation
+
+loadfonts(device="pdf")
+# loadfonts(device="pdf") if you have a mac
+
+```
+
+# Question 1
+
+Using the rubics in Data Visualization Checklist to grade the below figure:
+
+```{r grade_vis, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("graphs", "for_rating.png"), error = FALSE)
+```
+
+### Guideline: total score: 10/12
+
+-   6-12 word descriptive title is left-justified in upper left corner: 2
+-   Subtitle and/or annotations provide additional information: 2
+-   Text size is hierarchical and readable: 1 *(light font hard to read, not hierarchical)*
+-   Text is horizontal: 2
+-   Data are labeled directly: 1 *(can access the data by clicking)*
+-   Labels are used sparingly: 2
+
+### Arrangement: total score: 8/10
+
+-   Proportions are accurate: 2
+-   Data are intentionally ordered: 0 *(not intentionally ordered or color-coded)*
+-   Axis intervals are equidistant: 2
+-   Graph is two-dimensional: 2
+-   Display is free from decoration: 2
+
+### Color: total score: 2/10
+
+-   Color scheme is intentional: 0
+-   Color is used to highlight key patterns: 0
+-   Color is legible when printed in black and white: 0
+-   Color is legible for people with colorblindness: 0
+-   Text sufficiently contrasts background: 2
+
+### Lines: total score: 6/8
+
+-   Gridlines, if present, are muted: 0
+-   Graph does not have border line: 2
+-   Axes do not have unnecessary tick marks or axis lines: 2
+-   Graph has one horizontal and one vertical axis: 2
+
+### Overall: total score: 8/8
+
+-   Graph highlights significant finding or conclusion: 2
+-   The type of graph is appropriate for data: 2
+-   Graph has appropriate level of precision: 2
+-   Individual chart elements work together to reinforce the overarching takeaway message: 2
+
+### Conclusion: total score 34/48 = 71%
+
+-   Figure 10 is overall an effective visualization to illustrate the point that all industry sectors have seen sharp decrease of employment after the national emergency declared on Mar 13
+-   However, improvements can be made on the color selection of lines, e.g. grouped the retail subsectors in similar colors, etc.
+
+# Question 2
+
+One of the worst visualizations that I have created is with the Ask-A-Manager dataset:
+
+```{r worst_vis, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("graphs", "worst_graph.png"), error = FALSE)
+```
+
+There are several fatal problems with this visualization:
+
+- Guideline: Title and subtitle are missing from the graph, and there is no unit specified for Y-axis
+
+- Arrangement: For the purpose of maximizing output, I put both mean salary and median salary onto the graph, but it created confusion and didn't add anything insightful besides we know the dataset is right-skewed
+
+- Color: Colorcoded by gender is not necessary in this visualization
+
+- Lines: grid lines not muted
+
+# Question 3
+
+### Import and clean the data
+
+```{r Q3,message=FALSE,warning=FALSE}
+# Read data
+stop_search <- read.csv(here::here("data/2021-09-metropolitan-stop-and-search.csv"),na.strings=c("","NA"))
+
+# Cleaning
+stop_search <- clean_names(stop_search)
+
+stop_search <- stop_search %>% 
+  mutate(date = ymd(substr(date,1,10)),
+         type_search = as.factor(type),
+         gender = factor(gender,levels=c("Male","Female","Other")),
+         ethnicity = factor(officer_defined_ethnicity,levels = c("Asian","Black","White","Other")), 
+         object=as.factor(object_of_search),
+         outcome = as.factor(outcome),
+         age_range=factor(age_range,levels = c("under 10","10-17","18-24","25-34","over 34","NA")))
+```
+
+### Weekly fluctuation for stop-and-search cases
+```{r Plot0,message=FALSE,warning=FALSE}
+ss_plot0 <- stop_search %>% 
+  group_by(date,type_search) %>% 
+  summarise(count=n())
+
+  ggplot(ss_plot0,aes(x=date,y=count,color=type_search))+
+    geom_line()+
+    geom_point()+
+    theme_minimal()+
+  theme(legend.position="right", 
+        panel.grid.major = element_blank(),
+        axis.line = element_line(colour = "grey"))+
+  scale_color_manual(values=c("lightblue1","skyblue1","grey"))+
+  labs(title = "Weekly pattern for stop-and-search in London, most are personal search",subtitle = "Type of searches for stop-and-search in London in September",x="Date",y="Number of stop-and-search in September 2021")
+
+```
+
+### Most stop-and-search in London target young male
+
+```{r Plot1,message=FALSE,warning=FALSE}
+ss_plot1 <- stop_search %>% 
+  filter((!is.na(gender))&(gender!="Other")&(!is.na(age_range))) %>% 
+  group_by(age_range,gender) %>% 
+  summarise(count=n()) 
+
+gender_perc <- stop_search %>% 
+  filter((!is.na(gender))&(gender!="Other")&(!is.na(age_range))) %>% 
+  group_by(gender) %>% 
+  summarise(count=n()) %>% 
+  mutate(prop=count/sum(count))
+
+ggplot(ss_plot1,aes(x=gender,y=count,fill = age_range))+
+  geom_col(position="stack",width=0.7)+
+  theme_minimal()+
+    geom_text(
+    data = data.frame(x = c("Male","Female"), y = c(12000,1500), label =c(paste("Male proportion: ",91.8,"%"),paste("Female proportion: ",8.2,"%"))),
+    aes(x = x, y = y, label = label),
+    colour="black",
+    family="Lato",
+    vjust = 2,
+    lineheight = 1.5,
+    inherit.aes = FALSE
+  )+
+  theme(legend.position="right", 
+        panel.grid.major = element_blank(),
+        axis.line = element_line(colour = "grey"))+
+  scale_fill_manual(values=c("snow1","lightcyan1","lightblue1","lightblue2","grey"))+
+  labs(title = " 92% of stop-and-search targets male and over half aged between 18-34",subtitle = "Distribution of gender and age range for stop-and-search in London",x="Gender",y="Total number of stop-and-search in September 2021")
+```
+
+### Significant search disparity towards black people
+
+```{r Plot2,message=FALSE,warning=FALSE}
+ss_plot2 <- stop_search %>% 
+  filter(!is.na(ethnicity)) %>% 
+  group_by(week=week(date),ethnicity) %>% 
+  summarise(count = n()) %>% 
+  mutate(prop=count/sum(count),
+         week = case_when(week == 35  ~ "1",
+                          week == 36  ~ "2",
+                          week == 37  ~ "3",
+                          week == 38  ~ "4",
+                          week == 39  ~ "5"))
+
+plot2 <- ggplot(ss_plot2,
+       aes(x=week,y=count,fill= ethnicity))+
+  geom_col(width=0.8)+
+    geom_text(position = position_stack(),
+    aes(label = paste(round(prop*100),"%"), y=count),
+    colour = "white",
+    size = 4,
+    vjust = 1.2,
+    family="Lato"
+  ) +
+  theme_minimal()+
+  theme(legend.position="right", 
+        panel.grid.major = element_blank(),
+        axis.line = element_line(colour = "grey"))+
+  scale_fill_manual(values=c("seashell3","firebrick","gray60","gray44"))+
+  labs(title = str_wrap("Accounting for c. 13% of total population in london, black people take up c. 40% of weekly stop-and-search",width=60), subtitle = "Percentage of each ethnicity for weekly stop-and-search in London",x="Week in September 2021",y="Total number of stop-and-search per week",size=13)
+
+plot2
+
+```
+
+### Controlled drugs is the most common objective with \~30% penalized rate
+
+```{r Plot3,message=FALSE,warning=FALSE}
+ss_plot3 <- stop_search %>% 
+  filter(!is.na(object))%>% 
+  group_by(object,outcome) %>% 
+  summarise(count=n()) %>% 
+  mutate(penalized=1-count/sum(count),sum=sum(count))
+
+test <- subset(ss_plot3,outcome=="A no further action disposal")
+
+plot3 <- ggplot(test,aes(y=fct_reorder(object,sum),x=count,fill=penalized))+ 
+  geom_col(position="dodge", stat="identity",width=0.5)+
+  geom_text(
+    data = data.frame(x = 5000, y = "Controlled drugs", label ="penalized rate ~ 30%"),
+    aes(x = x, y = y, label = label),
+    colour="yellow1",
+    family="Lato",
+    hjust = 0.5,
+    lineheight = .8,
+    inherit.aes = FALSE,
+  )+
+  scale_fill_gradient(low="lightsteelblue1", high="midnightblue")+
+  theme_minimal()+
+  theme(legend.position="right",
+        legend.title=element_text(size=10),
+        axis.line = element_line(colour = "grey"))+
+  labs(title="Controlled drugs is the most common object for stop-and-search in London",subtitle = "Objective for stop-and-search and corresponding penalized rate in London",x="Total number of stop-and-search in September 2021", y="Object for stop-and-search")
+
+plot3
+```
