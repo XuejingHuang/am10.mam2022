@@ -4,7 +4,7 @@ library(here)
 library(extrafont)
 library(ggtext)
 
-loadfonts(device="win")
+loadfonts(device="pdf")
 
 # you must try to recreate
 # 1. session2_challenge.png (a static image where you have to use a shapefile and country results)
@@ -23,7 +23,7 @@ party_colours <- c("#2E74C0", "#CB454A")
 # remotes::install_github("UrbanInstitute/urbnmapr")
 library(urbnmapr)
 
-counties_sf <- get_urbn_map("counties", sf = TRUE)
+counties_sf <- get_urbn_map("counties", sf = TRUE) %>% mutate(fips=county_fips)
 
 class(counties_sf)
 counties_sf$geometry
@@ -39,3 +39,7 @@ counties_sf %>%
 # https://github.com/favstats/USElection2020-NYT-Results/tree/master/data/2020-11-10%2014-35-07
 
 results_president <- vroom::vroom(here("data", "results_president.csv"))
+
+result_map <- left_join(results_president,counties_sf,by="fips")
+
+
