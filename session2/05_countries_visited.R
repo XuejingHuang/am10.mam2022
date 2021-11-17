@@ -68,3 +68,4 @@ ggplot(world_visited)+
   theme_ipsum_rc(grid="", strip_text_face = "bold") +
 #  theme_ft_rc(grid="", strip_text_face = "bold") +
   NULL
+

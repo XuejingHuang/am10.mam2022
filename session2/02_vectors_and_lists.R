@@ -99,3 +99,4 @@ gapminder %>%
 gapminder %>%
   dplyr::select_if(is.numeric) %>%
   map_dbl(sd) 
+

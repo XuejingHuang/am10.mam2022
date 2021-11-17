@@ -4,6 +4,7 @@ library(janitor)
 library(vroom)
 library(skimr)
 library(sf)
+library(lessR)
 
 # read many CSV files
 # Adapted from https://www.gerkelab.com/blog/2018/09/import-directory-csv-purrr-readr/
@@ -118,3 +119,4 @@ london_wgs84 <-  london_wards_sf %>%
   st_transform(4326) # transform CRS to WGS84, latitude/longitude
 
 st_geometry(london_wgs84) # what is the geometry ?
+

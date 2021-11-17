@@ -23,7 +23,7 @@ ggplot(data = map) +
   geom_sf()
 
 
-df <- map %>% 
+df <- map %>% #join data and world data so that can plot map
   rename(iso_code=iso_a3) %>% 
   left_join(
     covid_data %>% 

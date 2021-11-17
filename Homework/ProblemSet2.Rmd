@@ -1,0 +1,200 @@
+---
+title: "ProblemSet2"
+author: "Xuejing"
+date: "16/11/2021"
+output:
+  html_document:
+    theme: cerulean
+    number_sections: no
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE, 
+  warning = FALSE, 
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+options(digits = 3)
+
+# default figure size
+knitr::opts_chunk$set(
+  fig.width=6.75, 
+  fig.height=6.75,
+  fig.align = "center"
+)
+```
+
+```{r libraries, include=FALSE}
+library(ggthemes)
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+library(lubridate)
+library(extrafont)
+library(vroom)
+library(ggtext)
+library(gapminder)
+library(ggrepel)
+library(patchwork)
+library(gghighlight)
+library(skimr)
+library(Rcpp)
+library(janitor) # clean_names()
+library(ggforce)
+library(ggmap)
+library(gridExtra)
+library(pander)
+library(here)
+library(leaflet)
+library(tmap)
+library(tmaptools)
+library(hrbrthemes)
+library(mapview)
+library(viridis)
+# remotes::install_github("kjhealy/nycdogs")
+library(nycdogs)
+library(sf) # for geospatial visualisation
+
+loadfonts(device="pdf")
+# loadfonts(device="pdf") if you have a mac
+
+```
+
+
+```{r ICE ,message=FALSE,warning=FALSE}
+# Read data
+data_dir <- here::here("data/stop-search")
+
+files <- fs::dir_ls(path = data_dir, regexp = "\\.csv$", recurse = TRUE) 
+#recurse=TRUE will recursively look for files further down into any folders
+
+#read them all in using vroom::vroom()
+stop_search_data <- vroom(files, id = "source")
+
+#cleaning
+stop_search_cleaned <- stop_search_data %>% 
+  clean_names() %>%
+  select(-source, -part_of_a_policing_operation, -policing_operation, - outcome_linked_to_object_of_search,
+         -removal_of_more_than_just_outer_clothing)
+
+stop_search_cleaned <- stop_search_cleaned %>% 
+  mutate(self_defined_ethnicity = case_when(grepl("^Asian", self_defined_ethnicity) ~ "Asian",
+                                            grepl("^Black", self_defined_ethnicity) ~ "Black",
+                                            grepl("^White", self_defined_ethnicity) ~ "White",
+                                            T ~ "Other"),
+         object_of_search = case_when(object_of_search == "Controlled drugs" ~ "drugs",
+                                      object_of_search %in% c("Offensive weapns", "Anything to threaten or harm anyone") ~ "weapons",
+                                      object_of_search == "Stolen goods" ~ "stolen goods",
+                                      T ~ "other"),
+         outcome = case_when(outcome == "A no further action disposal" ~ "disposal",
+                             outcome  == "Arrest" ~ "arrest",
+                             outcome == "Community resolution" ~ "community resolution",
+                             T ~ "other"))
+
+stop_search_cleaned <- stop_search_cleaned %>% 
+  drop_na() %>% 
+  rename(lat = latitude,
+         lng = longitude) %>% 
+  mutate(age_range = fct_relevel(age_range, c("under 10", "10-17", "18-24", "25-34", "over 34")),
+         month = month(date),
+         year = year(date))
+
+```
+### Plot on London Map 
+
+```{r}
+stop_search_sf <-  st_as_sf(stop_search_cleaned, 
+                              coords=c('lng', 'lat'), 
+                              crs = 4326)
+st_geometry(stop_search_sf)
+
+london_wards_sf <- read_sf(here::here("data/London-wards-2018_ESRI","London_Ward.shp"))
+st_geometry(london_wards_sf)
+
+# change the CRS to use WGS84 lng/lat pairs
+london_wgs84 <-  london_wards_sf %>% 
+  st_transform(4326)
+
+
+#Plot against gender
+ggplot() +
+  geom_sf(
+    data = london_wgs84, fill = "cornsilk", size = 0.1, colour = "royalblue4" ) +
+  geom_point(
+    data = stop_search_cleaned %>% filter(lat < 51.8 & lng > -0.6 & outcome == "arrest"), aes(x = lng, y = lat, fill = gender), size = 1.5, alpha = 0.7, shape = 21
+  ) + 
+  scale_fill_manual(values=c("hotpink1","lightblue1","grey"))+
+  coord_sf(datum = NA) +
+#  facet_grid(officer_defined_ethnicity ~ self_defined_ethnicity, labeller = label_both +
+  labs(
+    title = "The majority of people arrested in Stop-and-search are male",
+    subtitle = "Stop-and-search location in London mapped with target gender",
+    x = "",
+    y = "",
+    fill = "Gender"
+  ) +
+  theme_minimal() +
+  NULL
+
+
+#Plot against ethnicity
+ggplot() +
+  geom_sf(
+    data = london_wgs84, fill = "cornsilk", size = 0.1, colour = "royalblue4" ) +
+  geom_point(
+    data = stop_search_cleaned %>% filter(lat < 51.8 & lng > -0.6 & outcome == "arrest"), aes(x = lng, y = lat, fill = officer_defined_ethnicity), size = 1.5, alpha = 0.7, shape = 21
+  ) + 
+  scale_fill_manual(values=c("tan","firebrick","azure1","snow2"))+
+  coord_sf(datum = NA) +
+  labs(
+    title = "A significant number arrested in Stop-and-search are black people",
+    subtitle = "Stop-and-search location in London mapped with target ethnicity",
+    x = "",
+    y = "",
+    fill = "Ethnicity"
+  ) +
+  theme_minimal() +
+  NULL
+
+
+tmap::tmap_mode("view") # interactive map
+
+```
+
+```{r}
+london_wgs84_2 <- london_wgs84 %>%
+  mutate(count = lengths(
+    st_contains(london_wgs84, 
+                stop_search_sf %>%
+                  filter(outcome == "arrest")))) 
+
+
+ggplot(data = london_wgs84_2, aes(fill = count)) +
+  geom_sf() +
+  scale_fill_gradient(low = "snow1", high = "firebrick") +
+  theme_minimal() +
+  coord_sf(datum = NA) +
+  labs(title = "Central london has higher rate of arrest",
+       subtitle = "Number of stop-and-search arrests mapped with London wards",
+       fill = "Number of Arrests") +
+  theme(axis.text = element_blank()) +
+  theme(strip.text = element_text(color = "white")) +
+  NULL
+
+
+tmap::tmap_mode("view") # interactive map
+tmap::tm_shape(london_wgs84_2) +
+  tm_polygons("count")
+
+
+```
+### Thought piece on the visualization
+
+With a significantly larger dataset, it makes sense to analyze the stop-and-search of which the outcomes are _Arrest_. In the three map plots, I have shown that the majority of people arrested in stop-and-searches are male, and a significant amount of arrests happen on black people. Central London has a higher density in terms of number of arrests.
+
+When designing the plots, the CRAP principle was adopted as colors I chose has high contrast, especially for the part I want to emphasize on. Titles and subtitles are top-left aligned. 
+
+Evaluated based on Alberto Cairo’s 5 qualities for a great visualization, the visulizations conveys the right message without manipulating axis to mislead the audience. They are functional in telling the story, aesthetically pleasing in design and color, insightful as they mapped the data with geographical information, and enlightening as they reveal the distribution of stop-and-search in London.
